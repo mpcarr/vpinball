@@ -1081,7 +1081,6 @@ STDMETHODIMP Flasher::put_VideoCapUpdateFromMemory(BSTR cSharedMemoryLocation)
    if (shared_memory_base == nullptr)
    {
       DWORD error_code = GetLastError();
-      std::cerr << "Could not map view of file. Error code: " << error_code << std::endl;
       CloseHandle(hMapFile);
       return S_FALSE;
    }
@@ -1090,7 +1089,6 @@ STDMETHODIMP Flasher::put_VideoCapUpdateFromMemory(BSTR cSharedMemoryLocation)
    unsigned int *active_buffer = reinterpret_cast<unsigned int *>(shared_memory_base);
    if (*active_buffer > 1)
    {
-      std::cerr << "Invalid active buffer index: " << *active_buffer << std::endl;
       UnmapViewOfFile(shared_memory_base);
       CloseHandle(hMapFile);
       return S_FALSE;
@@ -1105,7 +1103,6 @@ STDMETHODIMP Flasher::put_VideoCapUpdateFromMemory(BSTR cSharedMemoryLocation)
 
    if (dest == nullptr)
    {
-      std::cerr << "m_videoCapTex->data() is null." << std::endl;
       UnmapViewOfFile(shared_memory_base);
       CloseHandle(hMapFile);
       return S_FALSE;
