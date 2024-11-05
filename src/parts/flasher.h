@@ -207,6 +207,7 @@ public:
    STDMETHOD(put_VideoCapWidth)(/*[in]*/ long cWidth);
    STDMETHOD(put_VideoCapHeight)(/*[in]*/ long cHeight);
    STDMETHOD(put_VideoCapUpdate)(/*[in]*/ BSTR cWinTitle);
+   STDMETHOD(put_VideoCapUpdateFromMemory)(/*[in]*/ BSTR cSharedMemoryLocation);
 
    STDMETHOD(get_DepthBias)(/*[out, retval]*/ float *pVal);
    STDMETHOD(put_DepthBias)(/*[in]*/ float newVal);

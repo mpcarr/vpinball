@@ -1047,6 +1047,95 @@ STDMETHODIMP Flasher::put_VideoCapUpdate(BSTR cWinTitle)
     return S_OK;
 }
 
+STDMETHODIMP Flasher::put_VideoCapUpdateFromMemory(BSTR cSharedMemoryLocation)
+{
+   if (m_videoCapWidth == 0 || m_videoCapHeight == 0)
+      return S_FALSE;
+
+   const size_t frame_size = m_videoCapWidth * m_videoCapHeight * 4; // 4 bytes per pixel for RGBA
+   const size_t double_buffer_size = frame_size * 2; // Space for two frames
+   const size_t total_shared_memory_size = sizeof(unsigned int) + double_buffer_size;
+
+   // Convert BSTR to a char array and prepend "Local\\"
+   char szSharedMemoryName[MAXNAMEBUFFER];
+   WideCharToMultiByte(CP_ACP, 0, cSharedMemoryLocation, -1, szSharedMemoryName, MAXNAMEBUFFER - 6, nullptr, nullptr); // Reserve space for "Local\\"
+   char fullSharedMemoryName[MAXNAMEBUFFER];
+   snprintf(fullSharedMemoryName, MAXNAMEBUFFER, "Local\\%s", szSharedMemoryName);
+
+   if (!m_isVideoCap)
+   {
+      ResetVideoCap();
+      m_videoCapTex = new BaseTexture(m_videoCapWidth, m_videoCapHeight, BaseTexture::SRGBA);
+      m_isVideoCap = true;
+   }
+   
+   // Open the shared memory region"
+   HANDLE hMapFile = OpenFileMappingA(FILE_MAP_READ, FALSE, szSharedMemoryName);
+   if (hMapFile == nullptr)
+   {
+      DWORD error_code = GetLastError();
+      return S_FALSE;
+   }
+
+   unsigned char *shared_memory_base = static_cast<unsigned char *>(MapViewOfFile(hMapFile, FILE_MAP_READ, 0, 0, total_shared_memory_size));
+   if (shared_memory_base == nullptr)
+   {
+      DWORD error_code = GetLastError();
+      std::cerr << "Could not map view of file. Error code: " << error_code << std::endl;
+      CloseHandle(hMapFile);
+      return S_FALSE;
+   }
+
+   // The first 4 bytes hold the active buffer index (0 or 1)
+   unsigned int *active_buffer = reinterpret_cast<unsigned int *>(shared_memory_base);
+   if (*active_buffer > 1)
+   {
+      std::cerr << "Invalid active buffer index: " << *active_buffer << std::endl;
+      UnmapViewOfFile(shared_memory_base);
+      CloseHandle(hMapFile);
+      return S_FALSE;
+   }
+
+   // Calculate the pointer to the start of the frame buffers
+   unsigned char *buffer_start = shared_memory_base + sizeof(unsigned int);
+
+   // Set the source pointer based on the active buffer index
+   unsigned int *src = reinterpret_cast<unsigned int *>(buffer_start + (*active_buffer) * frame_size);
+   unsigned int *dest = reinterpret_cast<unsigned int *>(m_videoCapTex->data());
+
+   if (dest == nullptr)
+   {
+      std::cerr << "m_videoCapTex->data() is null." << std::endl;
+      UnmapViewOfFile(shared_memory_base);
+      CloseHandle(hMapFile);
+      return S_FALSE;
+   }
+
+   // Calculate the number of pixels in the frame
+   size_t num_pixels = m_videoCapWidth * m_videoCapHeight;
+
+   try
+   {
+      // Copy RGBA frame data directly from shared memory to texture
+      std::copy(src, src + num_pixels, dest);
+   }
+   catch (...)
+   {
+      UnmapViewOfFile(shared_memory_base);
+      CloseHandle(hMapFile);
+      return S_FALSE;
+   }
+
+   // Mark the texture as updated
+   m_rd->m_texMan.SetDirty(m_videoCapTex);
+
+   // Cleanup
+   UnmapViewOfFile(shared_memory_base);
+   CloseHandle(hMapFile);
+
+   return S_OK;
+}
+
 STDMETHODIMP Flasher::get_DepthBias(float *pVal)
 {
    *pVal = m_d.m_depthBias;
