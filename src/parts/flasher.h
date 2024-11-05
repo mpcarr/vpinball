@@ -159,6 +159,12 @@ private:
    HWND m_videoCapHwnd = nullptr;
    BaseTexture* m_videoCapTex = nullptr;
 
+   HANDLE m_hMapFile = nullptr;
+   unsigned char *m_sharedMemoryBase = nullptr;
+   size_t m_frameSize = 0;
+   size_t m_doubleBufferSize = 0;
+   unsigned char *m_bufferStart = nullptr;
+
    int2 m_dmdSize = int2(128,32);
    BaseTexture *m_texdmd = nullptr;
 
@@ -207,8 +213,11 @@ public:
    STDMETHOD(put_VideoCapWidth)(/*[in]*/ long cWidth);
    STDMETHOD(put_VideoCapHeight)(/*[in]*/ long cHeight);
    STDMETHOD(put_VideoCapUpdate)(/*[in]*/ BSTR cWinTitle);
-   STDMETHOD(put_VideoCapUpdateFromMemory)(/*[in]*/ BSTR cSharedMemoryLocation);
-
+   
+   STDMETHOD(put_SetSharedMemoryVideoCap)(/*[in]*/ BSTR cSharedMemoryLocation);
+   STDMETHOD(VideoCapUpdateFromMemory)();
+   STDMETHOD(StopSharedMemoryVideoCap)();
+   
    STDMETHOD(get_DepthBias)(/*[out, retval]*/ float *pVal);
    STDMETHOD(put_DepthBias)(/*[in]*/ float newVal);
    STDMETHOD(get_ImageAlignment)(/*[out, retval]*/ RampImageAlignment *pVal);

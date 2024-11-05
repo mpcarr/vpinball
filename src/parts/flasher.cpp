@@ -951,184 +951,205 @@ void Flasher::ResetVideoCap()
 //if PASSED a blank title then we treat this as STOP capture and free resources.
 STDMETHODIMP Flasher::put_VideoCapUpdate(BSTR cWinTitle)
 {
-    if (m_videoCapWidth == 0 || m_videoCapHeight == 0) return S_FALSE; //safety.  VideoCapWidth/Height needs to be set prior to this call
+   if (m_videoCapWidth == 0 || m_videoCapHeight == 0)
+      return S_FALSE; //safety.  VideoCapWidth/Height needs to be set prior to this call
 
-    char szWinTitle[MAXNAMEBUFFER];
-    WideCharToMultiByteNull(CP_ACP, 0, cWinTitle, -1, szWinTitle, MAXNAMEBUFFER, nullptr, nullptr);
+   char szWinTitle[MAXNAMEBUFFER];
+   WideCharToMultiByteNull(CP_ACP, 0, cWinTitle, -1, szWinTitle, MAXNAMEBUFFER, nullptr, nullptr);
 
-    //if PASS blank title then we treat as STOP capture and free resources.  Should be called on table1_exit
-    if (szWinTitle[0] == '\0')
-    {
-        ResetVideoCap();
-        return S_OK;
-    }
+   //if PASS blank title then we treat as STOP capture and free resources.  Should be called on table1_exit
+   if (szWinTitle[0] == '\0')
+   {
+      ResetVideoCap();
+      return S_OK;
+   }
 
-    if (m_isVideoCap == false) {  // VideoCap has not started because no sourcewin found
-        m_videoCapHwnd = ::FindWindow(0, szWinTitle);
-        if (m_videoCapHwnd == nullptr)
-            return S_FALSE;
+   if (m_isVideoCap == false)
+   { // VideoCap has not started because no sourcewin found
+      m_videoCapHwnd = ::FindWindow(0, szWinTitle);
+      if (m_videoCapHwnd == nullptr)
+         return S_FALSE;
 
-        //source videocap found.  lets start!
-        GetClientRect(m_videoCapHwnd, &m_videoSourceRect);
-        ResetVideoCap();
-        try
-        {
-           m_videoCapTex = new BaseTexture(m_videoCapWidth, m_videoCapHeight, BaseTexture::SRGBA);
-        }
-        catch (...)
-        {
-           delete m_videoCapTex;
-           m_videoCapTex = nullptr;
-           return S_FAIL;
-        }
-    }
+      //source videocap found.  lets start!
+      GetClientRect(m_videoCapHwnd, &m_videoSourceRect);
+      ResetVideoCap();
+      try
+      {
+         m_videoCapTex = new BaseTexture(m_videoCapWidth, m_videoCapHeight, BaseTexture::SRGBA);
+      }
+      catch (...)
+      {
+         delete m_videoCapTex;
+         m_videoCapTex = nullptr;
+         return S_FAIL;
+      }
+   }
 
-    // Retrieve the handle to a display device context for the client
-    // area of the window.
+   // Retrieve the handle to a display device context for the client
+   // area of the window.
 
-    const HDC hdcWindow = GetDC(m_videoCapHwnd);
+   const HDC hdcWindow = GetDC(m_videoCapHwnd);
 
-    // Create a compatible DC, which is used in a BitBlt from the window DC.
-    const HDC hdcMemDC = CreateCompatibleDC(hdcWindow);
+   // Create a compatible DC, which is used in a BitBlt from the window DC.
+   const HDC hdcMemDC = CreateCompatibleDC(hdcWindow);
 
-    // Get the client area for size calculation.
-    const int pWidth = m_videoCapWidth;
-    const int pHeight = m_videoCapHeight;
+   // Get the client area for size calculation.
+   const int pWidth = m_videoCapWidth;
+   const int pHeight = m_videoCapHeight;
 
-    // Create a compatible bitmap from the Window DC.
-    const HBITMAP hbmScreen = CreateCompatibleBitmap(hdcWindow, pWidth, pHeight);
+   // Create a compatible bitmap from the Window DC.
+   const HBITMAP hbmScreen = CreateCompatibleBitmap(hdcWindow, pWidth, pHeight);
 
-    // Select the compatible bitmap into the compatible memory DC.
-    SelectObject(hdcMemDC, hbmScreen);
-    SetStretchBltMode(hdcMemDC, HALFTONE);
-    // Bit block transfer into our compatible memory DC.
-    m_isVideoCap = StretchBlt(hdcMemDC, 0, 0, pWidth, pHeight, hdcWindow, 0, 0, m_videoSourceRect.right - m_videoSourceRect.left, m_videoSourceRect.bottom - m_videoSourceRect.top, SRCCOPY);
-    if (m_isVideoCap)
-    {
-        // Get the BITMAP from the HBITMAP.
-        BITMAP bmpScreen;
-        GetObject(hbmScreen, sizeof(BITMAP), &bmpScreen);
+   // Select the compatible bitmap into the compatible memory DC.
+   SelectObject(hdcMemDC, hbmScreen);
+   SetStretchBltMode(hdcMemDC, HALFTONE);
+   // Bit block transfer into our compatible memory DC.
+   m_isVideoCap = StretchBlt(hdcMemDC, 0, 0, pWidth, pHeight, hdcWindow, 0, 0, m_videoSourceRect.right - m_videoSourceRect.left, m_videoSourceRect.bottom - m_videoSourceRect.top, SRCCOPY);
+   if (m_isVideoCap)
+   {
+      // Get the BITMAP from the HBITMAP.
+      BITMAP bmpScreen;
+      GetObject(hbmScreen, sizeof(BITMAP), &bmpScreen);
 
-        BITMAPINFOHEADER bi;
-        bi.biSize = sizeof(BITMAPINFOHEADER);
-        bi.biWidth = bmpScreen.bmWidth;
-        bi.biHeight = -bmpScreen.bmHeight;
-        bi.biPlanes = 1;
-        bi.biBitCount = 32;
-        bi.biCompression = BI_RGB;
-        bi.biSizeImage = 0;
-        bi.biXPelsPerMeter = 0;
-        bi.biYPelsPerMeter = 0;
-        bi.biClrUsed = 0;
-        bi.biClrImportant = 0;
+      BITMAPINFOHEADER bi;
+      bi.biSize = sizeof(BITMAPINFOHEADER);
+      bi.biWidth = bmpScreen.bmWidth;
+      bi.biHeight = -bmpScreen.bmHeight;
+      bi.biPlanes = 1;
+      bi.biBitCount = 32;
+      bi.biCompression = BI_RGB;
+      bi.biSizeImage = 0;
+      bi.biXPelsPerMeter = 0;
+      bi.biYPelsPerMeter = 0;
+      bi.biClrUsed = 0;
+      bi.biClrImportant = 0;
 
-        const DWORD dwBmpSize = ((bmpScreen.bmWidth * bi.biBitCount + 31) / 32) * 4 * bmpScreen.bmHeight;
+      const DWORD dwBmpSize = ((bmpScreen.bmWidth * bi.biBitCount + 31) / 32) * 4 * bmpScreen.bmHeight;
 
-        const HANDLE hDIB = GlobalAlloc(GHND, dwBmpSize);
-        char* lpbitmap = (char*)GlobalLock(hDIB);
+      const HANDLE hDIB = GlobalAlloc(GHND, dwBmpSize);
+      char *lpbitmap = (char *)GlobalLock(hDIB);
 
-        // Gets the "bits" from the bitmap, and copies them into a buffer 
-        // that's pointed to by lpbitmap.
-        GetDIBits(hdcWindow, hbmScreen, 0, (UINT)bmpScreen.bmHeight, lpbitmap, (BITMAPINFO*)&bi, DIB_RGB_COLORS);
+      // Gets the "bits" from the bitmap, and copies them into a buffer
+      // that's pointed to by lpbitmap.
+      GetDIBits(hdcWindow, hbmScreen, 0, (UINT)bmpScreen.bmHeight, lpbitmap, (BITMAPINFO *)&bi, DIB_RGB_COLORS);
 
-        // copy bitmap pixels to texture, reversing BGR to RGB and adding an opaque alpha channel
-        copy_bgra_rgba<true>((unsigned int*)(m_videoCapTex->data()), (const unsigned int*)lpbitmap, pWidth * pHeight);
+      // copy bitmap pixels to texture, reversing BGR to RGB and adding an opaque alpha channel
+      copy_bgra_rgba<true>((unsigned int *)(m_videoCapTex->data()), (const unsigned int *)lpbitmap, pWidth * pHeight);
 
-        GlobalUnlock(hDIB);
-        GlobalFree(hDIB);
+      GlobalUnlock(hDIB);
+      GlobalFree(hDIB);
 
-        m_rd->m_texMan.SetDirty(m_videoCapTex);
-    }
+      m_rd->m_texMan.SetDirty(m_videoCapTex);
+   }
 
-    ReleaseDC(m_videoCapHwnd, hdcWindow);
-    DeleteObject(hbmScreen);
-    DeleteObject(hdcMemDC);
+   ReleaseDC(m_videoCapHwnd, hdcWindow);
+   DeleteObject(hbmScreen);
+   DeleteObject(hdcMemDC);
 
-    return S_OK;
+
+   return S_OK;
 }
 
-STDMETHODIMP Flasher::put_VideoCapUpdateFromMemory(BSTR cSharedMemoryLocation)
+STDMETHODIMP Flasher::put_SetSharedMemoryVideoCap(BSTR cSharedMemoryLocation)
 {
    if (m_videoCapWidth == 0 || m_videoCapHeight == 0)
       return S_FALSE;
 
-   const size_t frame_size = m_videoCapWidth * m_videoCapHeight * 4; // 4 bytes per pixel for RGBA
-   const size_t double_buffer_size = frame_size * 2; // Space for two frames
-   const size_t total_shared_memory_size = sizeof(unsigned int) + double_buffer_size;
+   // Calculate frame size and double buffer size
+   m_frameSize = m_videoCapWidth * m_videoCapHeight * 4; // 4 bytes per pixel for RGBA
+   m_doubleBufferSize = m_frameSize * 2;
+
+   // Total shared memory size (4 bytes for active_buffer + double buffer)
+   const size_t total_shared_memory_size = sizeof(unsigned int) + m_doubleBufferSize;
 
    // Convert BSTR to a char array and prepend "Local\\"
    char szSharedMemoryName[MAXNAMEBUFFER];
-   WideCharToMultiByte(CP_ACP, 0, cSharedMemoryLocation, -1, szSharedMemoryName, MAXNAMEBUFFER - 6, nullptr, nullptr); // Reserve space for "Local\\"
+   WideCharToMultiByte(CP_ACP, 0, cSharedMemoryLocation, -1, szSharedMemoryName, MAXNAMEBUFFER - 6, nullptr, nullptr);
    char fullSharedMemoryName[MAXNAMEBUFFER];
    snprintf(fullSharedMemoryName, MAXNAMEBUFFER, "Local\\%s", szSharedMemoryName);
 
+   // Open the shared memory region once
+   m_hMapFile = OpenFileMappingA(FILE_MAP_READ, FALSE, fullSharedMemoryName);
+   if (m_hMapFile == nullptr)
+   {
+      DWORD error_code = GetLastError();
+      return S_FALSE;
+   }
+
+   // Map the shared memory view once
+   m_sharedMemoryBase = static_cast<unsigned char *>(MapViewOfFile(m_hMapFile, FILE_MAP_READ, 0, 0, total_shared_memory_size));
+   if (m_sharedMemoryBase == nullptr)
+   {
+      DWORD error_code = GetLastError();
+      CloseHandle(m_hMapFile);
+      m_hMapFile = nullptr;
+      return S_FALSE;
+   }
+
+   // Initialize buffer pointer to start after the active buffer index
+   m_bufferStart = m_sharedMemoryBase + sizeof(unsigned int);
+
+   // Initialize texture
    if (!m_isVideoCap)
    {
       ResetVideoCap();
       m_videoCapTex = new BaseTexture(m_videoCapWidth, m_videoCapHeight, BaseTexture::SRGBA);
       m_isVideoCap = true;
    }
-   
-   // Open the shared memory region"
-   HANDLE hMapFile = OpenFileMappingA(FILE_MAP_READ, FALSE, szSharedMemoryName);
-   if (hMapFile == nullptr)
-   {
-      DWORD error_code = GetLastError();
-      return S_FALSE;
-   }
 
-   unsigned char *shared_memory_base = static_cast<unsigned char *>(MapViewOfFile(hMapFile, FILE_MAP_READ, 0, 0, total_shared_memory_size));
-   if (shared_memory_base == nullptr)
-   {
-      DWORD error_code = GetLastError();
-      CloseHandle(hMapFile);
+   return S_OK;
+}
+
+//if PASSED a blank title then we treat this as STOP capture and free resources.
+STDMETHODIMP Flasher::VideoCapUpdateFromMemory()
+{
+   if (m_sharedMemoryBase == nullptr || m_hMapFile == nullptr)
       return S_FALSE;
-   }
 
    // The first 4 bytes hold the active buffer index (0 or 1)
-   unsigned int *active_buffer = reinterpret_cast<unsigned int *>(shared_memory_base);
+   unsigned int *active_buffer = reinterpret_cast<unsigned int *>(m_sharedMemoryBase);
    if (*active_buffer > 1)
    {
-      UnmapViewOfFile(shared_memory_base);
-      CloseHandle(hMapFile);
       return S_FALSE;
    }
 
-   // Calculate the pointer to the start of the frame buffers
-   unsigned char *buffer_start = shared_memory_base + sizeof(unsigned int);
-
    // Set the source pointer based on the active buffer index
-   unsigned int *src = reinterpret_cast<unsigned int *>(buffer_start + (*active_buffer) * frame_size);
+   unsigned int *src = reinterpret_cast<unsigned int *>(m_bufferStart + (*active_buffer) * m_frameSize);
    unsigned int *dest = reinterpret_cast<unsigned int *>(m_videoCapTex->data());
 
    if (dest == nullptr)
-   {
-      UnmapViewOfFile(shared_memory_base);
-      CloseHandle(hMapFile);
       return S_FALSE;
-   }
 
    // Calculate the number of pixels in the frame
    size_t num_pixels = m_videoCapWidth * m_videoCapHeight;
 
-   try
-   {
-      // Copy RGBA frame data directly from shared memory to texture
-      std::copy(src, src + num_pixels, dest);
-   }
-   catch (...)
-   {
-      UnmapViewOfFile(shared_memory_base);
-      CloseHandle(hMapFile);
-      return S_FALSE;
-   }
+   // Copy RGBA frame data directly from shared memory to texture
+   std::copy(src, src + num_pixels, dest);
 
    // Mark the texture as updated
    m_rd->m_texMan.SetDirty(m_videoCapTex);
 
-   // Cleanup
-   UnmapViewOfFile(shared_memory_base);
-   CloseHandle(hMapFile);
+   return S_OK;
+}
+
+STDMETHODIMP Flasher::StopSharedMemoryVideoCap()
+{
+   if (m_sharedMemoryBase != nullptr)
+   {
+      UnmapViewOfFile(m_sharedMemoryBase);
+      m_sharedMemoryBase = nullptr;
+   }
+   if (m_hMapFile != nullptr)
+   {
+      CloseHandle(m_hMapFile);
+      m_hMapFile = nullptr;
+   }
+   if (m_videoCapTex != nullptr)
+   {
+      delete m_videoCapTex;
+      m_videoCapTex = nullptr;
+   }
+   m_isVideoCap = false;
 
    return S_OK;
 }
